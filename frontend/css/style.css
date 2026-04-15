@@ -1,0 +1,650 @@
+/* ============================================
+   PenDrop - Minimalist Writing Interface
+   ============================================ */
+
+:root {
+    /* Colors - Clean Light Theme */
+    --bg-primary: #ffffff;
+    --bg-secondary: #f7f7f5;
+    --bg-tertiary: #efefef;
+    --text-primary: #1a1a1a;
+    --text-secondary: #6b6b6b;
+    --text-muted: #999999;
+    --border: #e5e5e5;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --error: #ef4444;
+    
+    /* Spacing */
+    --sidebar-width: 280px;
+    --topbar-height: 56px;
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
+    --spacing-lg: 24px;
+    --spacing-xl: 32px;
+    
+    /* Typography */
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-serif: 'Georgia', 'Times New Roman', serif;
+    --font-mono: 'SF Mono', 'Fira Code', monospace;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-sans);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    height: 100vh;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+}
+
+#app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+/* ============================================
+   Top Bar
+   ============================================ */
+
+.top-bar {
+    height: var(--topbar-height);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--spacing-lg);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-primary);
+    flex-shrink: 0;
+}
+
+.top-bar-left {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-lg);
+}
+
+.logo {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.mode-toggle {
+    display: flex;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    padding: 4px;
+}
+
+.mode-btn {
+    padding: 8px 16px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.15s ease;
+}
+
+.mode-btn:hover {
+    color: var(--text-primary);
+}
+
+.mode-btn.active {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.top-bar-center {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+}
+
+.doc-title-input {
+    border: none;
+    background: transparent;
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-primary);
+    text-align: center;
+    padding: 8px 16px;
+    min-width: 200px;
+    max-width: 400px;
+    border-radius: 6px;
+}
+
+.doc-title-input:hover {
+    background: var(--bg-secondary);
+}
+
+.doc-title-input:focus {
+    outline: none;
+    background: var(--bg-secondary);
+}
+
+.top-bar-right {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.save-status {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.save-status.saving {
+    color: var(--warning);
+}
+
+.save-status.saved {
+    color: var(--success);
+}
+
+.save-btn {
+    padding: 8px 20px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.save-btn:hover {
+    background: var(--accent-hover);
+}
+
+/* ============================================
+   Main Content
+   ============================================ */
+
+.main-content {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* ============================================
+   Sidebar
+   ============================================ */
+
+.sidebar {
+    width: var(--sidebar-width);
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.sidebar-section {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.sidebar-section.hidden {
+    display: none;
+}
+
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-md);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+}
+
+.sidebar-header span {
+    flex: 1;
+}
+
+.back-btn {
+    padding: 4px 8px;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 14px;
+    margin-right: var(--spacing-sm);
+}
+
+.back-btn:hover {
+    color: var(--text-primary);
+}
+
+.add-btn {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.add-btn:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+}
+
+.items-list,
+.tree-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-sm);
+}
+
+/* Book/Journal Item */
+.item {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.1s ease;
+    margin-bottom: 2px;
+}
+
+.item:hover {
+    background: var(--bg-tertiary);
+}
+
+.item.active {
+    background: var(--accent);
+    color: white;
+}
+
+.item.active .item-meta {
+    color: rgba(255,255,255,0.7);
+}
+
+.item-title {
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.item-meta {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+/* Chapter Tree Item */
+.chapter-item {
+    padding: var(--spacing-xs) 0;
+    margin-left: var(--spacing-md);
+}
+
+.chapter-item[data-level="1"] { margin-left: 0; }
+.chapter-item[data-level="2"] { margin-left: var(--spacing-md); }
+.chapter-item[data-level="3"] { margin-left: calc(var(--spacing-md) * 2); }
+
+.chapter-row {
+    display: flex;
+    align-items: center;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.1s ease;
+    gap: var(--spacing-xs);
+}
+
+.chapter-row:hover {
+    background: var(--bg-tertiary);
+}
+
+.chapter-row.active {
+    background: var(--accent);
+    color: white;
+}
+
+.chapter-row .drag-handle {
+    cursor: grab;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.chapter-row .chapter-title {
+    flex: 1;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.chapter-row .chapter-actions {
+    display: none;
+    gap: var(--spacing-xs);
+}
+
+.chapter-row:hover .chapter-actions {
+    display: flex;
+}
+
+.chapter-row .chapter-action {
+    padding: 2px 6px;
+    background: transparent;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+.chapter-row .chapter-action:hover {
+    opacity: 1;
+}
+
+/* ============================================
+   Editor Area
+   ============================================ */
+
+.editor-area {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    overflow-y: auto;
+    background: var(--bg-primary);
+}
+
+.editor-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+.editor-empty.hidden {
+    display: none;
+}
+
+.editor-container {
+    width: 100%;
+    max-width: 800px;
+    padding: var(--spacing-xl) var(--spacing-lg);
+}
+
+.editor-container.hidden {
+    display: none;
+}
+
+/* Tiptap Editor Styles */
+#tiptap-editor {
+    min-height: 500px;
+    outline: none;
+}
+
+#tiptap-editor .ProseMirror {
+    min-height: 500px;
+    font-size: 16px;
+    line-height: 1.75;
+    color: var(--text-primary);
+}
+
+#tiptap-editor .ProseMirror p {
+    margin-bottom: var(--spacing-md);
+}
+
+#tiptap-editor .ProseMirror h1 {
+    font-size: 32px;
+    font-weight: 700;
+    margin: var(--spacing-lg) 0 var(--spacing-md);
+    line-height: 1.3;
+}
+
+#tiptap-editor .ProseMirror h2 {
+    font-size: 24px;
+    font-weight: 600;
+    margin: var(--spacing-lg) 0 var(--spacing-sm);
+    line-height: 1.4;
+}
+
+#tiptap-editor .ProseMirror h3 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: var(--spacing-md) 0 var(--spacing-sm);
+}
+
+#tiptap-editor .ProseMirror ul,
+#tiptap-editor .ProseMirror ol {
+    padding-left: var(--spacing-lg);
+    margin-bottom: var(--spacing-md);
+}
+
+#tiptap-editor .ProseMirror li {
+    margin-bottom: var(--spacing-xs);
+}
+
+#tiptap-editor .ProseMirror blockquote {
+    border-left: 3px solid var(--accent);
+    padding-left: var(--spacing-md);
+    margin: var(--spacing-md) 0;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+#tiptap-editor .ProseMirror code {
+    font-family: var(--font-mono);
+    background: var(--bg-secondary);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+#tiptap-editor .ProseMirror pre {
+    background: var(--bg-secondary);
+    padding: var(--spacing-md);
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: var(--spacing-md) 0;
+}
+
+#tiptap-editor .ProseMirror pre code {
+    background: none;
+    padding: 0;
+}
+
+#tiptap-editor .ProseMirror img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin: var(--spacing-md) 0;
+}
+
+/* Placeholder */
+#tiptap-editor .ProseMirror p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    float: left;
+    color: var(--text-muted);
+    pointer-events: none;
+    height: 0;
+}
+
+/* ============================================
+   Snapshot Panel
+   ============================================ */
+
+.snapshot-panel {
+    width: 300px;
+    background: var(--bg-secondary);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+}
+
+.snapshot-panel.hidden {
+    display: none;
+}
+
+.snapshot-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-md);
+    border-bottom: 1px solid var(--border);
+}
+
+.snapshot-header h3 {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.close-btn {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 20px;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.close-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.snapshots-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-sm);
+}
+
+.snapshot-item {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: 6px;
+    margin-bottom: var(--spacing-xs);
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+}
+
+.snapshot-item:hover {
+    border-color: var(--accent);
+}
+
+.snapshot-time {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.snapshot-desc {
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: var(--spacing-xs);
+}
+
+.snapshot-actions {
+    display: flex;
+    gap: var(--spacing-xs);
+}
+
+.snapshot-action {
+    padding: 4px 8px;
+    background: var(--bg-secondary);
+    border: none;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--text-secondary);
+}
+
+.snapshot-action:hover {
+    background: var(--accent);
+    color: white;
+}
+
+/* ============================================
+   Snapshot FAB (Floating Action Button)
+   ============================================ */
+
+.snapshot-fab {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: white;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+    transition: all 0.2s ease;
+}
+
+.snapshot-fab:hover {
+    background: var(--accent-hover);
+    transform: scale(1.05);
+}
+
+.snapshot-fab.hidden {
+    display: none;
+}
+
+/* ============================================
+   Utility Classes
+   ============================================ */
+
+.hidden {
+    display: none !important;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}

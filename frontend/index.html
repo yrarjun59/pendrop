@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PenDrop</title>
+    <link rel="stylesheet" href="css/style.css">
+    
+    <!-- Tiptap CSS from CDN -->
+    <link rel="stylesheet" href="https://unpkg.com/@tiptap/extension-placeholder.css@2.2.0/dist/placeholder.css">
+    <link rel="stylesheet" href="https://unpkg.com/tiptap@2.2.0/dist/tiptap.min.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Top Bar -->
+        <header class="top-bar">
+            <div class="top-bar-left">
+                <h1 class="logo">✒️ PenDrop</h1>
+                <div class="mode-toggle">
+                    <button class="mode-btn active" data-mode="books">📖 Books</button>
+                    <button class="mode-btn" data-mode="journal">📝 Journal</button>
+                </div>
+            </div>
+            <div class="top-bar-center">
+                <input type="text" id="doc-title" class="doc-title-input" placeholder="Untitled">
+            </div>
+            <div class="top-bar-right">
+                <span class="save-status" id="save-status">Saved</span>
+                <button class="save-btn" id="save-btn">Save</button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Sidebar -->
+            <aside class="sidebar" id="sidebar">
+                <!-- Books Section -->
+                <div id="books-section" class="sidebar-section">
+                    <div class="sidebar-header">
+                        <span>Books</span>
+                        <button class="add-btn" id="add-book-btn" title="New Book">+</button>
+                    </div>
+                    <div id="books-list" class="items-list"></div>
+                </div>
+
+                <!-- Chapters Tree (shown when book selected) -->
+                <div id="chapters-section" class="sidebar-section hidden">
+                    <div class="sidebar-header">
+                        <button class="back-btn" id="back-to-books">←</button>
+                        <span id="current-book-title">Book Title</span>
+                        <button class="add-btn" id="add-chapter-btn" title="Add Chapter">+</button>
+                    </div>
+                    <div id="chapters-list" class="tree-list"></div>
+                </div>
+
+                <!-- Journal Section -->
+                <div id="journal-section" class="sidebar-section hidden">
+                    <div class="sidebar-header">
+                        <span>Journal</span>
+                        <button class="add-btn" id="add-journal-btn" title="New Entry">+</button>
+                    </div>
+                    <div id="journal-list" class="items-list"></div>
+                </div>
+            </aside>
+
+            <!-- Editor Area -->
+            <section class="editor-area">
+                <div id="editor-empty" class="editor-empty">
+                    <p>Select a book and chapter to start writing</p>
+                </div>
+                <div id="editor-container" class="editor-container hidden">
+                    <div id="tiptap-editor"></div>
+                </div>
+            </section>
+
+            <!-- Snapshot Panel (right side) -->
+            <aside class="snapshot-panel hidden" id="snapshot-panel">
+                <div class="snapshot-header">
+                    <h3>📸 Snapshots</h3>
+                    <button class="close-btn" id="close-snapshots">×</button>
+                </div>
+                <div id="snapshots-list" class="snapshots-list"></div>
+            </aside>
+        </main>
+
+        <!-- Snapshot Button (floating) -->
+        <button class="snapshot-fab hidden" id="snapshot-fab" title="View Snapshots">📸</button>
+    </div>
+
+    <!-- Tiptap JS from CDN -->
+    <script src="https://unpkg.com/tiptap@2.2.0/dist/tiptap.min.js"></script>
+    
+    <!-- App Scripts -->
+    <script src="js/api.js"></script>
+    <script src="js/editor.js"></script>
+    <script src="js/sidebar.js"></script>
+    <script src="js/snapshots.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

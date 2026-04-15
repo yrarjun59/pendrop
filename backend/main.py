@@ -1,95 +1,81 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-import sqlite3
-import hashlib
-import os
-from datetime import datetime
+"""
+PenDrop Backend - FastAPI with SQLite
+"""
 
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+from typing import Optional, List
+from datetime import datetime
 from database import get_db, init_db
-from models import (
-    UserCreate, LoginRequest, JournalCreate, BookCreate, 
-    ChapterCreate, SnapshotCreate, EssayCreate, FictionCreate, PoemCreate
-)
 
 app = FastAPI()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Serve frontend static files
+@app.get("/")
+async def root():
+    return FileResponse(os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "index.html"))
+
+@app.get("/css/{filename}")
+async def serve_css(filename: str):
+    return FileResponse(os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "css", filename))
+
+@app.get("/js/{filename}")
+async def serve_js(filename: str):
+    return FileResponse(os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "js", filename))
 
 # ============================================
-# AUTHENTICATION - Reserved for later implementation
-# ============================================
-# Placeholder for auth routes
-# - POST /api/register
-# - POST /api/login
-
-def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
-
-def verify_password(password, hashed):
-    return hash_password(password) == hashed
-
-
-# ============================================
-# JOURNAL ROUTES
+# REQUEST/RESPONSE MODELS
 # ============================================
 
-@app.get("/api/journal/{user_id}")
-def get_journals(user_id: int):
-    conn = get_db()
-    entries = conn.execute(
-        "SELECT * FROM journal_entries WHERE user_id = ? ORDER BY created_at DESC", 
-        (user_id,)
-    ).fetchall()
-    conn.close()
-    return [dict(row) for row in entries]
+class BookCreate(BaseModel):
+    title: str
+    user_id: int = 1
 
-@app.post("/api/journal")
-def create_journal(entry: JournalCreate):
-    conn = get_db()
-    cursor = conn.execute(
-        "INSERT INTO journal_entries (user_id, title, content) VALUES (?, ?, ?)",
-        (entry.user_id, entry.title, entry.content)
-    )
-    conn.commit()
-    entry_id = cursor.lastrowid
-    conn.close()
-    return {"id": entry_id}
+class BookUpdate(BaseModel):
+    title: Optional[str] = None
 
-@app.put("/api/journal/{entry_id}")
-def update_journal(entry_id: int, entry: JournalCreate):
-    conn = get_db()
-    conn.execute(
-        "UPDATE journal_entries SET title = ?, content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-        (entry.title, entry.content, entry_id)
-    )
-    conn.commit()
-    conn.close()
-    return {"status": "updated"}
+class ChapterCreate(BaseModel):
+    title: str
+    parent_id: Optional[int] = None
+    content: Optional[str] = None
 
-@app.delete("/api/journal/{entry_id}")
-def delete_journal(entry_id: int):
-    conn = get_db()
-    conn.execute("DELETE FROM journal_entries WHERE id = ?", (entry_id,))
-    conn.commit()
-    conn.close()
-    return {"status": "deleted"}
+class ChapterUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+    parent_id: Optional[int] = None
+    position: Optional[int] = None
 
+class SnapshotCreate(BaseModel):
+    description: Optional[str] = None
+    content_json: Optional[str] = None
+
+class RestoreRequest(BaseModel):
+    snapshot_id: int
+
+class JournalCreate(BaseModel):
+    title: str = "Untitled"
+    content: str = ""
+    user_id: int = 1
+
+class JournalUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
 
 # ============================================
 # BOOKS ROUTES
 # ============================================
 
-@app.get("/api/books/{user_id}")
-def get_books(user_id: int):
+@app.get("/api/books")
+def get_books(user_id: int = 1):
     conn = get_db()
     books = conn.execute(
-        "SELECT * FROM books WHERE user_id = ? ORDER BY updated_at DESC", 
+        "SELECT * FROM books WHERE user_id = ? ORDER BY updated_at DESC",
         (user_id,)
     ).fetchall()
     conn.close()
@@ -105,16 +91,33 @@ def create_book(book: BookCreate):
     conn.commit()
     book_id = cursor.lastrowid
     conn.close()
-    return {"id": book_id}
+    return {"id": book_id, "title": book.title, "user_id": book.user_id}
+
+@app.get("/api/books/{book_id}")
+def get_book(book_id: int):
+    conn = get_db()
+    book = conn.execute("SELECT * FROM books WHERE id = ?", (book_id,)).fetchone()
+    conn.close()
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    return dict(book)
 
 @app.put("/api/books/{book_id}")
-def update_book(book_id: int, book: BookCreate):
+def update_book(book_id: int, book: BookUpdate):
     conn = get_db()
-    conn.execute(
-        "UPDATE books SET title = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-        (book.title, book_id)
-    )
-    conn.commit()
+    updates = []
+    values = []
+    
+    if book.title is not None:
+        updates.append("title = ?")
+        values.append(book.title)
+    
+    if updates:
+        updates.append("updated_at = CURRENT_TIMESTAMP")
+        values.append(book_id)
+        conn.execute(f"UPDATE books SET {', '.join(updates)} WHERE id = ?", values)
+        conn.commit()
+    
     conn.close()
     return {"status": "updated"}
 
@@ -127,235 +130,209 @@ def delete_book(book_id: int):
     conn.close()
     return {"status": "deleted"}
 
-
 # ============================================
-# CHAPTERS & SUB-CHAPTERS ROUTES
+# CHAPTERS ROUTES
 # ============================================
 
-@app.get("/api/chapters/{book_id}")
+@app.get("/api/books/{book_id}/chapters")
 def get_chapters(book_id: int):
     conn = get_db()
     chapters = conn.execute(
-        "SELECT * FROM chapters WHERE book_id = ? ORDER BY order_index", 
+        "SELECT * FROM chapters WHERE book_id = ? ORDER BY position, id",
         (book_id,)
     ).fetchall()
     conn.close()
     return [dict(row) for row in chapters]
 
-@app.post("/api/chapters")
-def create_chapter(chapter: ChapterCreate):
+@app.post("/api/books/{book_id}/chapters")
+def create_chapter(book_id: int, chapter: ChapterCreate):
     conn = get_db()
     
-    # Get next order index
-    if chapter.parent_chapter_id:
-        max_order = conn.execute(
-            "SELECT MAX(order_index) as max_order FROM chapters WHERE parent_chapter_id = ?",
-            (chapter.parent_chapter_id,)
-        ).fetchone()["max_order"] or 0
-    else:
-        max_order = conn.execute(
-            "SELECT MAX(order_index) as max_order FROM chapters WHERE book_id = ? AND parent_chapter_id IS NULL",
-            (chapter.book_id,)
-        ).fetchone()["max_order"] or 0
-    
-    next_order = max_order + 1
+    # Get next position
+    max_pos = conn.execute(
+        "SELECT MAX(position) as max_pos FROM chapters WHERE book_id = ? AND parent_id IS ?",
+        (book_id, chapter.parent_id)
+    ).fetchone()["max_pos"] or 0
     
     cursor = conn.execute(
-        "INSERT INTO chapters (book_id, title, content, order_index, parent_chapter_id) VALUES (?, ?, ?, ?, ?)",
-        (chapter.book_id, chapter.title, chapter.content, next_order, chapter.parent_chapter_id)
+        "INSERT INTO chapters (book_id, parent_id, title, content, position) VALUES (?, ?, ?, ?, ?)",
+        (book_id, chapter.parent_id, chapter.title, chapter.content or "", max_pos + 1)
     )
     conn.commit()
     chapter_id = cursor.lastrowid
     conn.close()
-    return {"id": chapter_id}
+    
+    return {"id": chapter_id, "book_id": book_id, "title": chapter.title, "parent_id": chapter.parent_id}
+
+@app.get("/api/chapters/{chapter_id}")
+def get_chapter(chapter_id: int):
+    conn = get_db()
+    chapter = conn.execute("SELECT * FROM chapters WHERE id = ?", (chapter_id,)).fetchone()
+    conn.close()
+    if not chapter:
+        raise HTTPException(status_code=404, detail="Chapter not found")
+    return dict(chapter)
 
 @app.put("/api/chapters/{chapter_id}")
-def update_chapter(chapter_id: int, chapter: ChapterCreate):
+def update_chapter(chapter_id: int, chapter: ChapterUpdate):
     conn = get_db()
-    conn.execute(
-        "UPDATE chapters SET title = ?, content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-        (chapter.title, chapter.content, chapter_id)
-    )
-    conn.commit()
+    updates = []
+    values = []
+    
+    if chapter.title is not None:
+        updates.append("title = ?")
+        values.append(chapter.title)
+    
+    if chapter.content is not None:
+        updates.append("content = ?")
+        values.append(chapter.content)
+    
+    if chapter.parent_id is not None:
+        updates.append("parent_id = ?")
+        values.append(chapter.parent_id)
+    
+    if chapter.position is not None:
+        updates.append("position = ?")
+        values.append(chapter.position)
+    
+    if updates:
+        updates.append("updated_at = CURRENT_TIMESTAMP")
+        values.append(chapter_id)
+        conn.execute(f"UPDATE chapters SET {', '.join(updates)} WHERE id = ?", values)
+        conn.commit()
+        
+        # Update book's updated_at
+        chapter_data = conn.execute("SELECT book_id FROM chapters WHERE id = ?", (chapter_id,)).fetchone()
+        if chapter_data:
+            conn.execute("UPDATE books SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", (chapter_data["book_id"],))
+            conn.commit()
+    
     conn.close()
     return {"status": "updated"}
 
 @app.delete("/api/chapters/{chapter_id}")
 def delete_chapter(chapter_id: int):
     conn = get_db()
-    # Delete sub-chapters first
-    conn.execute("DELETE FROM chapters WHERE parent_chapter_id = ?", (chapter_id,))
+    # Delete child chapters first
+    conn.execute("DELETE FROM chapters WHERE parent_id = ?", (chapter_id,))
+    # Delete snapshots
     conn.execute("DELETE FROM snapshots WHERE chapter_id = ?", (chapter_id,))
+    # Delete chapter
     conn.execute("DELETE FROM chapters WHERE id = ?", (chapter_id,))
     conn.commit()
     conn.close()
     return {"status": "deleted"}
 
-
 # ============================================
-# SNAPSHOTS ROUTES (Books only)
+# SNAPSHOTS ROUTES
 # ============================================
 
-@app.post("/api/snapshots")
-def create_snapshot(snap: SnapshotCreate):
+@app.get("/api/chapters/{chapter_id}/snapshots")
+def get_snapshots(chapter_id: int):
+    conn = get_db()
+    snapshots = conn.execute(
+        "SELECT * FROM snapshots WHERE chapter_id = ? ORDER BY created_at DESC",
+        (chapter_id,)
+    ).fetchall()
+    conn.close()
+    return [dict(row) for row in snapshots]
+
+@app.post("/api/chapters/{chapter_id}/snapshots")
+def create_snapshot(chapter_id: int, snap: SnapshotCreate):
     conn = get_db()
     cursor = conn.execute(
-        "INSERT INTO snapshots (chapter_id, content, note) VALUES (?, ?, ?)",
-        (snap.chapter_id, snap.content, snap.note)
+        "INSERT INTO snapshots (chapter_id, content_json, description) VALUES (?, ?, ?)",
+        (chapter_id, snap.content_json or "", snap.description or "Manual save")
     )
     conn.commit()
     snapshot_id = cursor.lastrowid
     conn.close()
     return {"id": snapshot_id}
 
-@app.get("/api/snapshots/{chapter_id}")
-def get_snapshots(chapter_id: int):
+@app.post("/api/chapters/{chapter_id}/restore")
+def restore_snapshot(chapter_id: int, req: RestoreRequest):
     conn = get_db()
-    snaps = conn.execute(
-        "SELECT * FROM snapshots WHERE chapter_id = ? ORDER BY created_at DESC", 
-        (chapter_id,)
-    ).fetchall()
+    
+    # Get snapshot content
+    snapshot = conn.execute("SELECT content_json FROM snapshots WHERE id = ? AND chapter_id = ?",
+                           (req.snapshot_id, chapter_id)).fetchone()
+    
+    if not snapshot:
+        raise HTTPException(status_code=404, detail="Snapshot not found")
+    
+    # Update chapter with snapshot content
+    conn.execute("UPDATE chapters SET content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (snapshot["content_json"], chapter_id))
+    conn.commit()
     conn.close()
-    return [dict(row) for row in snaps]
-
+    
+    return {"status": "restored"}
 
 # ============================================
-# ESSAYS ROUTES
+# JOURNAL ROUTES
 # ============================================
 
-@app.get("/api/essays/{user_id}")
-def get_essays(user_id: int):
+@app.get("/api/journal")
+def get_journal(user_id: int = 1):
     conn = get_db()
-    essays = conn.execute(
-        "SELECT * FROM essays WHERE user_id = ? ORDER BY updated_at DESC", 
+    entries = conn.execute(
+        "SELECT * FROM journal_entries WHERE user_id = ? ORDER BY updated_at DESC",
         (user_id,)
     ).fetchall()
     conn.close()
-    return [dict(row) for row in essays]
+    return [dict(row) for row in entries]
 
-@app.post("/api/essays")
-def create_essay(essay: EssayCreate):
+@app.post("/api/journal")
+def create_journal_entry(entry: JournalCreate):
     conn = get_db()
     cursor = conn.execute(
-        "INSERT INTO essays (user_id, title, content) VALUES (?, ?, ?)",
-        (essay.user_id, essay.title, essay.content)
+        "INSERT INTO journal_entries (user_id, title, content) VALUES (?, ?, ?)",
+        (entry.user_id, entry.title, entry.content)
     )
     conn.commit()
-    essay_id = cursor.lastrowid
+    entry_id = cursor.lastrowid
     conn.close()
-    return {"id": essay_id}
+    return {"id": entry_id, "title": entry.title}
 
-@app.put("/api/essays/{essay_id}")
-def update_essay(essay_id: int, essay: EssayCreate):
+@app.get("/api/journal/{entry_id}")
+def get_journal_entry(entry_id: int):
     conn = get_db()
-    conn.execute(
-        "UPDATE essays SET title = ?, content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-        (essay.title, essay.content, essay_id)
-    )
-    conn.commit()
+    entry = conn.execute("SELECT * FROM journal_entries WHERE id = ?", (entry_id,)).fetchone()
+    conn.close()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    return dict(entry)
+
+@app.put("/api/journal/{entry_id}")
+def update_journal_entry(entry_id: int, entry: JournalUpdate):
+    conn = get_db()
+    updates = []
+    values = []
+    
+    if entry.title is not None:
+        updates.append("title = ?")
+        values.append(entry.title)
+    
+    if entry.content is not None:
+        updates.append("content = ?")
+        values.append(entry.content)
+    
+    if updates:
+        updates.append("updated_at = CURRENT_TIMESTAMP")
+        values.append(entry_id)
+        conn.execute(f"UPDATE journal_entries SET {', '.join(updates)} WHERE id = ?", values)
+        conn.commit()
+    
     conn.close()
     return {"status": "updated"}
 
-@app.delete("/api/essays/{essay_id}")
-def delete_essay(essay_id: int):
+@app.delete("/api/journal/{entry_id}")
+def delete_journal_entry(entry_id: int):
     conn = get_db()
-    conn.execute("DELETE FROM essays WHERE id = ?", (essay_id,))
+    conn.execute("DELETE FROM journal_entries WHERE id = ?", (entry_id,))
     conn.commit()
     conn.close()
     return {"status": "deleted"}
-
-
-# ============================================
-# FICTION ROUTES
-# ============================================
-
-@app.get("/api/fictions/{user_id}")
-def get_fictions(user_id: int):
-    conn = get_db()
-    fictions = conn.execute(
-        "SELECT * FROM fictions WHERE user_id = ? ORDER BY updated_at DESC", 
-        (user_id,)
-    ).fetchall()
-    conn.close()
-    return [dict(row) for row in fictions]
-
-@app.post("/api/fictions")
-def create_fiction(fiction: FictionCreate):
-    conn = get_db()
-    cursor = conn.execute(
-        "INSERT INTO fictions (user_id, title, content) VALUES (?, ?, ?)",
-        (fiction.user_id, fiction.title, fiction.content)
-    )
-    conn.commit()
-    fiction_id = cursor.lastrowid
-    conn.close()
-    return {"id": fiction_id}
-
-@app.put("/api/fictions/{fiction_id}")
-def update_fiction(fiction_id: int, fiction: FictionCreate):
-    conn = get_db()
-    conn.execute(
-        "UPDATE fictions SET title = ?, content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-        (fiction.title, fiction.content, fiction_id)
-    )
-    conn.commit()
-    conn.close()
-    return {"status": "updated"}
-
-@app.delete("/api/fictions/{fiction_id}")
-def delete_fiction(fiction_id: int):
-    conn = get_db()
-    conn.execute("DELETE FROM fictions WHERE id = ?", (fiction_id,))
-    conn.commit()
-    conn.close()
-    return {"status": "deleted"}
-
-
-# ============================================
-# POEMS ROUTES
-# ============================================
-
-@app.get("/api/poems/{user_id}")
-def get_poems(user_id: int):
-    conn = get_db()
-    poems = conn.execute(
-        "SELECT * FROM poems WHERE user_id = ? ORDER BY updated_at DESC", 
-        (user_id,)
-    ).fetchall()
-    conn.close()
-    return [dict(row) for row in poems]
-
-@app.post("/api/poems")
-def create_poem(poem: PoemCreate):
-    conn = get_db()
-    cursor = conn.execute(
-        "INSERT INTO poems (user_id, title, content) VALUES (?, ?, ?)",
-        (poem.user_id, poem.title, poem.content)
-    )
-    conn.commit()
-    poem_id = cursor.lastrowid
-    conn.close()
-    return {"id": poem_id}
-
-@app.put("/api/poems/{poem_id}")
-def update_poem(poem_id: int, poem: PoemCreate):
-    conn = get_db()
-    conn.execute(
-        "UPDATE poems SET title = ?, content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-        (poem.title, poem.content, poem_id)
-    )
-    conn.commit()
-    conn.close()
-    return {"status": "updated"}
-
-@app.delete("/api/poems/{poem_id}")
-def delete_poem(poem_id: int):
-    conn = get_db()
-    conn.execute("DELETE FROM poems WHERE id = ?", (poem_id,))
-    conn.commit()
-    conn.close()
-    return {"status": "deleted"}
-
 
 # ============================================
 # MAIN
@@ -364,4 +341,4 @@ def delete_poem(poem_id: int):
 if __name__ == "__main__":
     import uvicorn
     init_db()
-    uvicorn.run(app, host="127.0.0.1", port=5000)
+    uvicorn.run(app, host="127.0.0.1", port=8000)
