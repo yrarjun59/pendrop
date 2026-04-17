@@ -1,84 +1,44 @@
-"""
-SQLite Database for PenDrop
-"""
-
 import sqlite3
-import os
+from contextlib import contextmanager
+from typing import Optional, List, Dict, Any
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "db", "pendrop.db")
+DB_PATH = "db/pendrop.db"
+HARDCODED_USER_ID = "local-user"
 
+@contextmanager
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    return conn
+    conn.execute("PRAGMA foreign_keys = ON")
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
-def init_db():
-    """Initialize all database tables"""
-    conn = get_db()
-    c = conn.cursor()
-    
-    # Users table
-    c.execute('''CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )''')
-    
-    # Books table
-    c.execute('''CREATE TABLE IF NOT EXISTS books (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        title TEXT NOT NULL,
-        description TEXT DEFAULT '',
-        settings TEXT DEFAULT '{}',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id)
-    )''')
-    
-    # Chapters table (with parent_id for nesting)
-    c.execute('''CREATE TABLE IF NOT EXISTS chapters (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        book_id INTEGER NOT NULL,
-        parent_id INTEGER,
-        title TEXT NOT NULL,
-        type TEXT DEFAULT 'chapter',
-        content TEXT DEFAULT '',
-        position INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE,
-        FOREIGN KEY (parent_id) REFERENCES chapters(id) ON DELETE CASCADE
-    )''')
-    
-    # Snapshots table (for chapters)
-    c.execute('''CREATE TABLE IF NOT EXISTS snapshots (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        chapter_id INTEGER NOT NULL,
-        content_json TEXT DEFAULT '',
-        type TEXT DEFAULT 'manual',
-        description TEXT DEFAULT '',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE
-    )''')
-    
-    # Journal entries
-    c.execute('''CREATE TABLE IF NOT EXISTS journal_entries (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        title TEXT DEFAULT 'Untitled',
-        content TEXT DEFAULT '',
-        mood TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id)
-    )''')
-    
-    conn.commit()
-    conn.close()
-    print(f"Database initialized at: {DB_PATH}")
+def execute_query(query: str, params: tuple = ()) -> List[Dict[str, Any]]:
+    """Execute a SELECT query and return results as list of dicts."""
+    with get_db() as conn:
+        rows = conn.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
 
-if __name__ == "__main__":
-    init_db()
+def execute_one(query: str, params: tuple = ()) -> Optional[Dict[str, Any]]:
+    """Execute a SELECT query and return first result or None."""
+    with get_db() as conn:
+        row = conn.execute(query, params).fetchone()
+        return dict(row) if row else None
+
+def execute_write(query: str, params: tuple = ()) -> int:
+    """Execute INSERT/UPDATE/DELETE and return affected row count."""
+    with get_db() as conn:
+        cursor = conn.execute(query, params)
+        return cursor.rowcount
+
+def execute_insert(query: str, params: tuple = ()) -> int:
+    """Execute INSERT and return the last inserted row ID."""
+    with get_db() as conn:
+        cursor = conn.execute(query, params)
+        return cursor.lastrowid

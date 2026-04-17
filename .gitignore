@@ -1,3 +1,5 @@
 .venv
 cmds.txt
 steps.txt
+cacher
+__pycache__
